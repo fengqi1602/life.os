@@ -723,6 +723,14 @@ a:hover { text-decoration: underline; }
   transform: translateY(-1px);
 }
 
+.ai-obs-card {
+  transition: border-color 0.3s ease, transform 0.2s ease;
+}
+.ai-obs-card:hover {
+  border-color: var(--border-focus);
+  transform: translateY(-1px);
+}
+
 .badge-done { background: rgba(0,255,136,0.15); color: var(--neon-green); border: 1px solid rgba(0,255,136,0.3); }
 .badge-current { background: rgba(0,240,255,0.15); color: var(--neon-cyan); border: 1px solid rgba(0,240,255,0.3); }
 .badge-planned { background: rgba(136,136,170,0.15); color: var(--text-secondary); border: 1px solid rgba(136,136,170,0.3); }
@@ -1223,6 +1231,10 @@ a:hover { text-decoration: underline; }
       <div class="nav-item" data-route="insights">
         <span class="nav-icon">&#128161;</span>
         <span>洞察中心</span>
+      </div>
+      <div class="nav-item" data-route="ai-observations">
+        <span class="nav-icon">&#129302;</span>
+        <span>AI 观察库</span>
       </div>
       <div class="nav-item" data-route="evolution">
         <span class="nav-icon">&#128200;</span>
@@ -2318,6 +2330,95 @@ const EvolutionLog = (() => {
   return { getAll: getAll, save: save, add: add, update: update, remove: remove, getById: getById };
 })();
 
+// ============================================
+// 观察层：AIObservation（AI 观察库）
+// ============================================
+const AIObservation = (() => {
+  var KEY = 'ai_observations';
+
+  function getDefault() {
+    return {
+      items: [
+        {
+          id: 'aio_001',
+          观察编号: 'AI观察001',
+          观察标题: '高验证需求倾向',
+          观察内容: '用户在面对重要决策时，倾向于优先验证方向，而非立即行动。\n\n具体表现：\n- 决策日志中多次出现"需要更多信息"作为决策原因\n- 行为观察中"持续推进"项目比例偏低，"中断"比例偏高\n- 思路演化链中多条处于"进行中"状态，闭环率不足\n\n推测原因：\n用户对不确定性容忍度较低，需要外部确认信号才能安心推进。',
+          观察时间: '2026-06-05',
+          观察周期: '2026-05-01 ~ 2026-06-05',
+          观察来源: '多模块交叉分析',
+          观察来源选项: ['多模块交叉分析', '决策日志分析', '行为观察分析', '思路演化分析', '聊天记录分析', '手动录入'],
+          相关记录ID: ['dec_001', 'behavior_001', 'thought_001'],
+          置信度: '80',
+          置信度选项: ['20', '40', '60', '80', '100'],
+          建议动作: '在决策模型中增加"最小可验证单元"字段，帮助用户设定验证边界',
+          状态: '候选',
+          状态选项: ['候选', '已采纳', '已忽略', '已验证'],
+          标签: ['决策模式', '验证需求', '行为特征']
+        }
+      ]
+    };
+  }
+
+  function getAll() {
+    var data = Store.get(KEY);
+    if (!data) {
+      data = getDefault();
+      Store.set(KEY, data);
+    }
+    return data;
+  }
+
+  function save(data) { Store.set(KEY, data); }
+
+  function add(item) {
+    var data = getAll();
+    var obs = {
+      id: item.id || Utils.generateId('aio'),
+      观察编号: item.观察编号 || '',
+      观察标题: item.观察标题 || '',
+      观察内容: item.观察内容 || '',
+      观察时间: item.观察时间 || new Date().toISOString().split('T')[0],
+      观察周期: item.观察周期 || '',
+      观察来源: item.观察来源 || '手动录入',
+      相关记录ID: item.相关记录ID || [],
+      置信度: item.置信度 || '60',
+      建议动作: item.建议动作 || '',
+      状态: item.状态 || '候选',
+      标签: item.标签 || []
+    };
+    data.items.unshift(obs);
+    save(data);
+    return obs;
+  }
+
+  function update(id, updates) {
+    var data = getAll();
+    var idx = data.items.findIndex(function(item) { return item.id === id; });
+    if (idx !== -1) {
+      Object.keys(updates).forEach(function(key) {
+        data.items[idx][key] = updates[key];
+      });
+      save(data);
+      return data.items[idx];
+    }
+    return null;
+  }
+
+  function remove(id) {
+    var data = getAll();
+    data.items = data.items.filter(function(item) { return item.id !== id; });
+    save(data);
+  }
+
+  function getById(id) {
+    var data = getAll();
+    return data.items.find(function(item) { return item.id === id; }) || null;
+  }
+
+  return { getAll: getAll, save: save, add: add, update: update, remove: remove, getById: getById };
+})();
+
 // 版本路线图数据
 const Roadmap = [
   { version: 'v0.1', title: '数据记录阶段', status: 'done', description: '用户模型、决策日志、思路演化链、行为观察' },
@@ -2640,6 +2741,9 @@ const Dashboard = (() => {
       // 演化日志统计
       const evolutionCount = EvolutionLog.getAll().items.length;
 
+      // AI 观察统计
+      const aiObsCount = AIObservation.getAll().items.length;
+
       return {
         completion,
         decisionCount: decisions.items.length,
@@ -2647,6 +2751,7 @@ const Dashboard = (() => {
         behaviorCount: behaviors.items.length,
         insightCount,
         evolutionCount,
+        aiObsCount,
         longGoals, midGoals, curGoals,
         mastered, developing, weaknesses
       };
@@ -4851,6 +4956,7 @@ const UI = (() => {
                 <option${e.module === '决策日志' ? ' selected' : ''}>决策日志</option>
                 <option${e.module === '思路演化链' ? ' selected' : ''}>思路演化链</option>
                 <option${e.module === '洞察中心' ? ' selected' : ''}>洞察中心</option>
+                <option${e.module === 'AI观察' ? ' selected' : ''}>AI观察</option>
                 <option${e.module === '其他' ? ' selected' : ''}>其他</option>
               </select>
               <input class="form-input" name="证据链_title_${i}" value="${Utils.escapeHtml(e.title || '')}" placeholder="标题" style="padding:6px 8px;">
@@ -4883,6 +4989,7 @@ const UI = (() => {
                 <option${isObj && r.module === '行为观察' ? ' selected' : ''}>行为观察</option>
                 <option${isObj && r.module === '决策日志' ? ' selected' : ''}>决策日志</option>
                 <option${isObj && r.module === '思路演化链' ? ' selected' : ''}>思路演化链</option>
+                <option${isObj && r.module === 'AI观察' ? ' selected' : ''}>AI观察</option>
                 <option${isObj && r.module === '其他' ? ' selected' : ''}>其他</option>
               </select>
               <input class="form-input" name="来源记录_recordId_${i}" value="${Utils.escapeHtml(isObj ? (r.recordId || '') : r)}" placeholder="记录ID" style="padding:6px 8px;">
@@ -4948,7 +5055,7 @@ const UI = (() => {
       div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;margin-bottom:8px;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);';
       div.innerHTML = `
         <select class="form-select" name="证据链_module_${evidenceIdx}" style="padding:6px 8px;">
-          <option>行为观察</option><option>决策日志</option><option>思路演化链</option><option>洞察中心</option><option>其他</option>
+          <option>行为观察</option><option>决策日志</option><option>思路演化链</option><option>洞察中心</option><option>AI观察</option><option>其他</option>
         </select>
         <input class="form-input" name="证据链_title_${evidenceIdx}" value="" placeholder="标题" style="padding:6px 8px;">
         <input class="form-input" name="证据链_recordId_${evidenceIdx}" value="" placeholder="记录ID" style="padding:6px 8px;">
@@ -4968,7 +5075,7 @@ const UI = (() => {
       div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;margin-bottom:8px;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);';
       div.innerHTML = `
         <select class="form-select" name="来源记录_module_${sourceIdx}" style="padding:6px 8px;">
-          <option>行为观察</option><option>决策日志</option><option>思路演化链</option><option>其他</option>
+          <option>行为观察</option><option>决策日志</option><option>思路演化链</option><option>AI观察</option><option>其他</option>
         </select>
         <input class="form-input" name="来源记录_recordId_${sourceIdx}" value="" placeholder="记录ID" style="padding:6px 8px;">
         <input class="form-input" name="来源记录_title_${sourceIdx}" value="" placeholder="标题" style="padding:6px 8px;">
@@ -5867,6 +5974,291 @@ const UI = (() => {
     };
   }
 
+  function renderAIObservations() {
+    var container = document.getElementById('main-content');
+    var data = AIObservation.getAll();
+
+    var html = '<div class="page-header">';
+    html += '<h1 class="page-title">&#129302; AI 观察库</h1>';
+    html += '<p class="page-subtitle">记录通过长期观察发现的规律与倾向，作为洞察的候选证据</p>';
+    html += '</div>';
+
+    // 筛选工具栏
+    html += '<div class="toolbar">';
+    html += '<input class="filter-input" id="ai-obs-filter" placeholder="搜索观察...">';
+    html += '<select class="filter-select" id="ai-obs-status-filter">';
+    html += '<option value="">全部状态</option>';
+    ['候选', '已采纳', '已忽略', '已验证'].forEach(function(s) {
+      html += '<option value="' + s + '">' + s + '</option>';
+    });
+    html += '</select>';
+    html += '<select class="filter-select" id="ai-obs-source-filter">';
+    html += '<option value="">全部来源</option>';
+    ['多模块交叉分析', '决策日志分析', '行为观察分析', '思路演化分析', '聊天记录分析', '手动录入'].forEach(function(s) {
+      html += '<option value="' + s + '">' + s + '</option>';
+    });
+    html += '</select>';
+    html += '<button class="btn btn-primary" id="btn-add-ai-obs">+ 新增 AI 观察</button>';
+    html += '</div>';
+
+    // 观察列表
+    if (data.items.length === 0) {
+      html += '<div class="empty-state"><div class="empty-state-icon">&#129302;</div><div class="empty-state-text">暂无 AI 观察记录</div></div>';
+    } else {
+      data.items.forEach(function(item) {
+        var statusClass = item.状态 === '候选' ? 'yellow' : (item.状态 === '已采纳' ? 'green' : (item.状态 === '已验证' ? 'cyan' : 'red'));
+        var confidenceNum = parseInt(item.置信度) || 0;
+        var confidenceColor = confidenceNum >= 80 ? 'var(--neon-green)' : (confidenceNum >= 60 ? 'var(--neon-yellow)' : 'var(--neon-red)');
+
+        html += '<div class="card ai-obs-card" data-ai-obs-id="' + item.id + '" style="margin-bottom:12px;cursor:pointer;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">';
+        html += '<div style="flex:1;min-width:200px;">';
+        html += '<div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:6px;">';
+        html += '<span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-muted);margin-right:8px;">' + Utils.escapeHtml(item.观察编号) + '</span>';
+        html += '<span class="badge badge-' + statusClass + '" style="font-size:0.72rem;padding:2px 8px;">' + Utils.escapeHtml(item.状态) + '</span>';
+        html += '</div>';
+        html += '<div style="font-weight:600;font-size:1rem;color:var(--text-primary);margin-bottom:4px;">' + Utils.escapeHtml(item.观察标题) + '</div>';
+        html += '<div style="color:var(--text-secondary);font-size:0.85rem;line-height:1.5;">' + Utils.escapeHtml(item.观察内容.split('\n')[0]) + '</div>';
+        html += '</div>';
+        html += '<div style="text-align:right;min-width:80px;margin-left:12px;">';
+        html += '<div style="font-family:var(--font-mono);font-size:1.2rem;font-weight:600;color:' + confidenceColor + ';">' + confidenceNum + '%</div>';
+        html += '<div style="font-size:0.75rem;color:var(--text-muted);">置信度</div>';
+        html += '</div>';
+        html += '</div>';
+        html += '<div style="margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;">';
+        html += '<span style="font-size:0.78rem;color:var(--text-muted);margin-right:12px;">' + Utils.escapeHtml(item.观察来源) + '</span>';
+        html += '<span style="font-size:0.78rem;color:var(--text-muted);margin-right:12px;">' + Utils.escapeHtml(item.观察时间) + '</span>';
+        (item.标签 || []).forEach(function(tag) {
+          html += '<span class="tag" style="font-size:0.72rem;">' + Utils.escapeHtml(tag) + '</span> ';
+        });
+        html += '</div>';
+        html += '</div>';
+      });
+    }
+
+    container.innerHTML = html;
+    bindAIObsEvents(data);
+  }
+
+  function showAIObsDetail(id) {
+    var item = AIObservation.getById(id);
+    if (!item) return;
+
+    var html = '<div class="modal-header">';
+    html += '<h2 class="modal-title">' + Utils.escapeHtml(item.观察编号) + '</h2>';
+    html += '<button class="modal-close" id="modal-close-btn">&times;</button>';
+    html += '</div>';
+    html += '<div class="modal-body">';
+
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;">';
+    html += '<div><span class="badge badge-yellow" style="margin-right:8px;">' + Utils.escapeHtml(item.状态) + '</span>';
+    html += '<span style="color:var(--text-muted);font-size:0.85rem;">' + Utils.escapeHtml(item.观察来源) + '</span></div>';
+    html += '<div style="font-family:var(--font-mono);font-size:1.3rem;font-weight:600;color:var(--neon-cyan);">' + item.置信度 + '% 置信度</div>';
+    html += '</div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">观察标题</label>';
+    html += '<div style="color:var(--text-primary);font-size:1.05rem;font-weight:500;">' + Utils.escapeHtml(item.观察标题) + '</div>';
+    html += '</div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">观察内容</label>';
+    html += '<div style="color:var(--text-primary);line-height:1.7;white-space:pre-wrap;">' + Utils.escapeHtml(item.观察内容) + '</div>';
+    html += '</div>';
+
+    html += '<div style="display:flex;flex-wrap:wrap;">';
+    html += '<div class="form-group" style="flex:1;min-width:200px;margin-right:16px;">';
+    html += '<label class="form-label">观察时间</label>';
+    html += '<div style="color:var(--text-primary);">' + Utils.escapeHtml(item.观察时间) + '</div>';
+    html += '</div>';
+    html += '<div class="form-group" style="flex:1;min-width:200px;">';
+    html += '<label class="form-label">观察周期</label>';
+    html += '<div style="color:var(--text-primary);">' + Utils.escapeHtml(item.观察周期) + '</div>';
+    html += '</div></div>';
+
+    if (item.相关记录ID && item.相关记录ID.length > 0) {
+      html += '<div class="form-group">';
+      html += '<label class="form-label">相关记录</label>';
+      html += '<div style="display:flex;flex-wrap:wrap;">';
+      item.相关记录ID.forEach(function(rid) {
+        html += '<span class="tag" style="margin-right:4px;">' + Utils.escapeHtml(rid) + '</span>';
+      });
+      html += '</div></div>';
+    }
+
+    if (item.建议动作) {
+      html += '<div class="form-group">';
+      html += '<label class="form-label">建议动作</label>';
+      html += '<div style="color:var(--neon-cyan);line-height:1.6;">' + Utils.escapeHtml(item.建议动作) + '</div>';
+      html += '</div>';
+    }
+
+    if (item.标签 && item.标签.length > 0) {
+      html += '<div class="form-group">';
+      html += '<label class="form-label">标签</label>';
+      html += '<div>';
+      item.标签.forEach(function(tag) {
+        html += '<span class="tag">' + Utils.escapeHtml(tag) + '</span> ';
+      });
+      html += '</div></div>';
+    }
+
+    html += '<div style="display:flex;justify-content:flex-end;margin-top:16px;">';
+    html += '<button class="btn btn-sm" id="btn-edit-ai-obs" style="margin-right:8px;">编辑</button>';
+    html += '<button class="btn btn-sm btn-danger" id="btn-delete-ai-obs">删除</button>';
+    html += '</div>';
+
+    html += '</div>';
+
+    document.getElementById('modal-container').innerHTML = html;
+    document.getElementById('modal-overlay').classList.add('active');
+
+    document.getElementById('modal-close-btn').onclick = hideModal;
+    document.getElementById('btn-edit-ai-obs').onclick = function() {
+      hideModal();
+      openAIObsEditModal(id);
+    };
+    document.getElementById('btn-delete-ai-obs').onclick = function() {
+      hideModal();
+      Utils.showConfirm('确定要删除这条 AI 观察吗？').then(function(confirmed) {
+        if (confirmed) {
+          AIObservation.remove(id);
+          renderAIObservations();
+          Dashboard.refresh();
+        }
+      });
+    };
+  }
+
+  function openAIObsEditModal(editId) {
+    var isEdit = !!editId;
+    var item = isEdit ? AIObservation.getById(editId) : {};
+
+    var html = '<div class="modal-header">';
+    html += '<h2 class="modal-title">' + (isEdit ? '编辑' : '新增') + ' AI 观察</h2>';
+    html += '<button class="modal-close" id="modal-close-btn">&times;</button>';
+    html += '</div>';
+    html += '<div class="modal-body">';
+
+    html += '<div style="display:flex;flex-wrap:wrap;">';
+    html += '<div class="form-group" style="flex:1;min-width:140px;margin-right:12px;">';
+    html += '<label class="form-label">观察编号</label>';
+    html += '<input class="form-input" id="aio-number" value="' + Utils.escapeHtml(item.观察编号 || '') + '" placeholder="如：AI观察001">';
+    html += '</div>';
+    html += '<div class="form-group" style="flex:1;min-width:140px;">';
+    html += '<label class="form-label">观察时间</label>';
+    html += '<input class="form-input" id="aio-date" type="date" value="' + Utils.escapeHtml(item.观察时间 || new Date().toISOString().split('T')[0]) + '">';
+    html += '</div></div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">观察标题</label>';
+    html += '<input class="form-input" id="aio-title" value="' + Utils.escapeHtml(item.观察标题 || '') + '" placeholder="简短描述观察主题">';
+    html += '</div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">观察内容</label>';
+    html += '<textarea class="form-input" id="aio-content" rows="6" placeholder="详细描述观察到的规律、表现和推测原因...">' + Utils.escapeHtml(item.观察内容 || '') + '</textarea>';
+    html += '</div>';
+
+    html += '<div style="display:flex;flex-wrap:wrap;">';
+    html += '<div class="form-group" style="flex:1;min-width:140px;margin-right:12px;">';
+    html += '<label class="form-label">观察来源</label>';
+    html += '<select class="form-input" id="aio-source">';
+    ['多模块交叉分析', '决策日志分析', '行为观察分析', '思路演化分析', '聊天记录分析', '手动录入'].forEach(function(s) {
+      html += '<option value="' + s + '"' + (item.观察来源 === s ? ' selected' : '') + '>' + s + '</option>';
+    });
+    html += '</select></div>';
+    html += '<div class="form-group" style="flex:1;min-width:140px;margin-right:12px;">';
+    html += '<label class="form-label">置信度</label>';
+    html += '<select class="form-input" id="aio-confidence">';
+    ['20', '40', '60', '80', '100'].forEach(function(c) {
+      html += '<option value="' + c + '"' + (item.置信度 === c ? ' selected' : '') + '>' + c + '%</option>';
+    });
+    html += '</select></div>';
+    html += '<div class="form-group" style="flex:1;min-width:140px;">';
+    html += '<label class="form-label">状态</label>';
+    html += '<select class="form-input" id="aio-status">';
+    ['候选', '已采纳', '已忽略', '已验证'].forEach(function(s) {
+      html += '<option value="' + s + '"' + (item.状态 === s ? ' selected' : '') + '>' + s + '</option>';
+    });
+    html += '</select></div></div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">观察周期</label>';
+    html += '<input class="form-input" id="aio-period" value="' + Utils.escapeHtml(item.观察周期 || '') + '" placeholder="如：2026-05-01 ~ 2026-06-05">';
+    html += '</div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">相关记录ID（逗号分隔）</label>';
+    html += '<input class="form-input" id="aio-refs" value="' + Utils.escapeHtml((item.相关记录ID || []).join(', ')) + '" placeholder="如：dec_001, behavior_001">';
+    html += '</div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">建议动作</label>';
+    html += '<textarea class="form-input" id="aio-action" rows="2" placeholder="基于这个观察，建议采取什么行动？">' + Utils.escapeHtml(item.建议动作 || '') + '</textarea>';
+    html += '</div>';
+
+    html += '<div class="form-group">';
+    html += '<label class="form-label">标签</label>';
+    html += '<input class="form-input" id="aio-tags" value="' + Utils.escapeHtml((item.标签 || []).join(', ')) + '" placeholder="如：决策模式, 验证需求">';
+    html += '</div>';
+
+    html += '</div>';
+    html += '<div class="modal-footer">';
+    html += '<button class="btn btn-outline" id="modal-cancel-btn">取消</button>';
+    html += '<button class="btn btn-primary" id="modal-save-btn">' + (isEdit ? '保存修改' : '添加观察') + '</button>';
+    html += '</div>';
+
+    document.getElementById('modal-container').innerHTML = html;
+    document.getElementById('modal-overlay').classList.add('active');
+
+    document.getElementById('modal-close-btn').onclick = hideModal;
+    document.getElementById('modal-cancel-btn').onclick = hideModal;
+    document.getElementById('modal-save-btn').onclick = function() {
+      var number = document.getElementById('aio-number').value.trim();
+      var title = document.getElementById('aio-title').value.trim();
+      if (!title) { alert('请输入观察标题'); return; }
+
+      var entry = {
+        观察编号: number,
+        观察标题: title,
+        观察内容: document.getElementById('aio-content').value,
+        观察时间: document.getElementById('aio-date').value,
+        观察周期: document.getElementById('aio-period').value,
+        观察来源: document.getElementById('aio-source').value,
+        置信度: document.getElementById('aio-confidence').value,
+        状态: document.getElementById('aio-status').value,
+        相关记录ID: document.getElementById('aio-refs').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean),
+        建议动作: document.getElementById('aio-action').value,
+        标签: document.getElementById('aio-tags').value.split(',').map(function(t) { return t.trim(); }).filter(Boolean)
+      };
+
+      if (isEdit) {
+        AIObservation.update(editId, entry);
+      } else {
+        AIObservation.add(entry);
+      }
+      hideModal();
+      renderAIObservations();
+      Dashboard.refresh();
+    };
+  }
+
+  function bindAIObsEvents(data) {
+    var addBtn = document.getElementById('btn-add-ai-obs');
+    if (addBtn) {
+      addBtn.onclick = function() { openAIObsEditModal(); };
+    }
+
+    var cards = document.querySelectorAll('.ai-obs-card');
+    cards.forEach(function(card) {
+      card.onclick = function() {
+        var id = card.getAttribute('data-ai-obs-id');
+        showAIObsDetail(id);
+      };
+    });
+  }
+
   return {
     renderDashboard,
     renderUserModel,
@@ -5875,7 +6267,8 @@ const UI = (() => {
     renderBehaviorObserver,
     renderInsightCenter,
     renderDataIO,
-    renderEvolutionLog
+    renderEvolutionLog,
+    renderAIObservations
   };
   })();
 
@@ -5902,6 +6295,7 @@ const UI = (() => {
       Router.register('insights', UI.renderInsightCenter);
       Router.register('data-io', UI.renderDataIO);
       Router.register('evolution', UI.renderEvolutionLog);
+      Router.register('ai-observations', UI.renderAIObservations);
       console.log('[LifeOS] Router Init Complete');
 
       // 导航点击事件
@@ -5958,7 +6352,7 @@ const UI = (() => {
   window.LifeOS = {
     Store, EventBus, Router, Utils,
     UserModel, DecisionLog, ThoughtChain, BehaviorObserver, InsightCenter, Dashboard,
-    AnalysisEngine, Migration, EvolutionLog,
+    AnalysisEngine, Migration, EvolutionLog, AIObservation,
     UI, App
   };
 
